@@ -25,7 +25,7 @@ pub const BOARD_SIZE: Column = WIDTH * HEIGHT;
 const BOTTOM: BitBoard = ((1 << ((HEIGHT + 1) * WIDTH)) - 1) / ((1 << (HEIGHT + 1)) - 1);
 const TOP: BitBoard = BOTTOM << HEIGHT;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy)]
 pub struct Board {
     moves: [Column; BOARD_SIZE as usize],
     heights: [Column; WIDTH as usize],
