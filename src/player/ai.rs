@@ -52,8 +52,6 @@ impl Player for AIPlayer {
             )
             .saturating_neg();
 
-            println!("{}: {}", column + 1, value);
-
             match value_best_move.saturating_sub(value) {
                 0 => {
                     best_moves[len_best_moves] = column;
