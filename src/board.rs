@@ -1,4 +1,5 @@
 use std::fmt;
+use std::ops::Deref;
 
 use crate::player::Token;
 
@@ -91,6 +92,12 @@ impl Board {
     /// Gets whether a move in the given column is legal.
     pub fn is_legal(&self, column: Column) -> bool {
         column < WIDTH && self.has_space(column)
+    }
+
+    /// Peeks ahead at the board state following a move in the given column.
+    pub fn peekable(&mut self, column: Column) -> PeekableBoard {
+        self.make_move(column);
+        PeekableBoard { board: self }
     }
 
     /// Makes a move in the given column for the current player.
@@ -191,6 +198,32 @@ impl fmt::Display for Board {
         }
 
         Ok(())
+    }
+}
+
+pub struct PeekableBoard<'a> {
+    board: &'a mut Board,
+}
+
+impl<'a> PeekableBoard<'a> {
+    pub fn peek(&mut self, column: Column) -> PeekableBoard {
+        self.board.make_move(column);
+
+        PeekableBoard { board: self.board }
+    }
+}
+
+impl<'a> Drop for PeekableBoard<'a> {
+    fn drop(&mut self) {
+        self.board.undo_move();
+    }
+}
+
+impl<'a> Deref for PeekableBoard<'a> {
+    type Target = Board;
+
+    fn deref(&self) -> &Self::Target {
+        self.board
     }
 }
 

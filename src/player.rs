@@ -23,6 +23,13 @@ impl Token {
     pub fn player(self) -> u8 {
         self as u8
     }
+
+    pub fn opponent(self) -> Token {
+        match self {
+            Token::Player1 => Token::Player2,
+            Token::Player2 => Token::Player1,
+        }
+    }
 }
 
 impl fmt::Display for Token {

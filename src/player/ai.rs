@@ -1,18 +1,18 @@
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::ops::Range;
 
 use rand::prelude::ThreadRng;
 use rand::Rng;
 
-use crate::board::{BitBoard, Board, Column, ColumnDiff, HEIGHT, WIDTH};
+use crate::board::{BitBoard, Board, Column, ColumnDiff, PeekableBoard, HEIGHT, WIDTH};
 use crate::player::{Player, Token};
 
 pub enum Difficulty {
-    Easy = 1,
-    Medium = 3,
-    Hard = 5,
+    Easy = 3,
+    Medium = 5,
+    Hard = 7,
     Master = 9,
-    Unfair = 15,
+    Unfair = 11,
 }
 
 pub struct AIPlayer {
@@ -36,7 +36,6 @@ impl AIPlayer {
 impl Player for AIPlayer {
     fn decide_move(&mut self, board: &Board, token: Token) -> Column {
         let mut board = *board;
-        let mut board = PeekableBoard::new(&mut board);
 
         let mut best_moves = [0; WIDTH as usize];
         let mut len_best_moves = 0;
@@ -45,16 +44,13 @@ impl Player for AIPlayer {
         for column in board.legal_moves() {
             let value = negamax(
                 &mut self.ttable,
-                board.peek(column),
+                board.peekable(column),
                 self.depth,
                 Score::MIN,
                 Score::MAX,
-                -1,
-            );
-            let value = match token {
-                Token::Player1 => value,
-                Token::Player2 => value.saturating_neg(),
-            };
+                token.opponent(),
+            )
+            .saturating_neg();
 
             println!("{}: {}", column + 1, value);
 
@@ -102,7 +98,7 @@ fn negamax(
     depth: usize,
     mut a: Score,
     mut b: Score,
-    color: Score,
+    side: Token,
 ) -> Score {
     let a_orig = a;
 
@@ -132,7 +128,7 @@ fn negamax(
         let is_full = legal_moves.peek().is_none();
 
         if depth == 0 || (winner.is_some() || is_full) {
-            return color * heuristic_value(&board, winner, is_full);
+            return heuristic_value(&board, side, winner, is_full);
         }
     }
 
@@ -142,10 +138,10 @@ fn negamax(
             negamax(
                 ttable,
                 board.peek(column),
-                depth - 1,
+                depth.saturating_sub(1),
                 b.saturating_neg(),
                 a.saturating_neg(),
-                -color,
+                side.opponent(),
             )
             .saturating_neg(),
         );
@@ -170,10 +166,9 @@ fn negamax(
     value
 }
 
-fn heuristic_value(board: &Board, winner: Option<Token>, is_full: bool) -> Score {
+fn heuristic_value(board: &Board, side: Token, winner: Option<Token>, is_full: bool) -> Score {
     const WIN: Score = 10_000;
 
-    let side = board.current_player();
     if let Some(winner) = winner {
         return if winner == side { WIN } else { -WIN };
     }
@@ -199,9 +194,10 @@ fn heuristic_value(board: &Board, winner: Option<Token>, is_full: bool) -> Score
 
                     if possible_len >= 4 {
                         let score = 10 * Score::from(current_len);
-                        match token {
-                            Token::Player1 => total_score += score,
-                            Token::Player2 => total_score -= score,
+                        if side == token {
+                            total_score += score;
+                        } else {
+                            total_score -= score;
                         }
                     }
                 }
@@ -224,11 +220,15 @@ fn get_length(
     let mut row = pos.0 as i8;
     let mut column = pos.1 as i8;
 
+    const ROWS: Range<i8> = 0..(HEIGHT as i8);
+    const COLUMNS: Range<i8> = 0..(WIDTH as i8);
+
     loop {
         row += direction.0;
         column += direction.1;
 
-        if row < 0 || column < 0 {
+        // Check the cell is inbounds, this is optimised in release builds.
+        if !(ROWS.contains(&row) && COLUMNS.contains(&column)) {
             break;
         }
 
@@ -242,34 +242,4 @@ fn get_length(
     }
 
     (current, possible)
-}
-
-struct PeekableBoard<'a> {
-    board: &'a mut Board,
-}
-
-impl<'a> PeekableBoard<'a> {
-    fn new(board: &mut Board) -> PeekableBoard {
-        PeekableBoard { board }
-    }
-
-    fn peek(&mut self, column: Column) -> PeekableBoard {
-        self.board.make_move(column);
-
-        PeekableBoard { board: self.board }
-    }
-}
-
-impl<'a> Drop for PeekableBoard<'a> {
-    fn drop(&mut self) {
-        self.board.undo_move();
-    }
-}
-
-impl<'a> Deref for PeekableBoard<'a> {
-    type Target = Board;
-
-    fn deref(&self) -> &Self::Target {
-        self.board
-    }
 }
